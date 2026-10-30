@@ -7,7 +7,8 @@
  * archive, or a manifest one folder down. Nothing else about the name matters, but the
  * folder keeps an unpacked package readable on disk.
  */
-import { cpSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { cpSync, mkdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { manifestOf, packageFiles, pluginDirs, root, run } from './lib.mjs';
 
@@ -31,8 +32,21 @@ for (const { dir } of pluginDirs()) {
   for (const file of files) cpSync(join(dir, file), join(packageDir, file), { recursive: true });
 
   const archive = join(dist, `${folder}.tgz`);
-  // `-h` would follow symlinks; there are none, and the installer refuses them anyway.
-  run('tar', ['-czf', archive, '-C', staging, folder], root);
+  // Reproducible on purpose: a fixed mtime, sorted names, numeric owner, and `gzip -n` so
+  // the gzip header carries no timestamp. CI rebuilds the archives to compare their hashes
+  // with `catalog.json`, and a fresh timestamp would make every rebuild differ — the catalog
+  // would then pin bytes that no longer exist.
+  const gz = execFileSync('gzip', ['-n', '-9', '-c'], {
+    cwd: root,
+    input: execFileSync(
+      'tar',
+      ['--sort=name', '--mtime=@0', '--owner=0', '--group=0', '--numeric-owner',
+        '--format=ustar', '-cf', '-', '-C', staging, folder],
+      { cwd: root, maxBuffer: 64 * 1024 * 1024 },
+    ),
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  writeFileSync(archive, gz);
   rmSync(staging, { recursive: true, force: true });
 
   const kb = (statSync(archive).size / 1024).toFixed(1);

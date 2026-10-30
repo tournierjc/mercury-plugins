@@ -1,6 +1,6 @@
 {
   "catalogVersion": 1,
-  "updatedAt": "2026-10-30T07:54:47Z",
+  "updatedAt": "2026-10-30T08:02:20Z",
   "plugins": [
     {
       "id": "diff-view",
@@ -16,8 +16,8 @@
       },
       "artifact": {
         "url": "https://github.com/tournierjc/mercury-plugins/releases/download/diff-view-v0.1.0/diff-view-0.1.0.tgz",
-        "sha256": "e52637c87fe5ff7a2bb4a2dc96cc7fdbb790d8a5da230000fd69051c3ab2cf7c",
-        "size": 4596
+        "sha256": "339dbc9e43e7d1e11b23f75cdc711a1887db6633a8ed3aee7d0c13bfa360762e",
+        "size": 4564
       },
       "tools": [],
       "permissions": {
@@ -39,8 +39,8 @@
       },
       "artifact": {
         "url": "https://github.com/tournierjc/mercury-plugins/releases/download/openui-contract-v0.2.0/openui-contract-0.2.0.tgz",
-        "sha256": "26e5c5bba46f2e98b6ebddfbe9463fd8ae5e4c41a9e8f5fd5fd9608ce4274d25",
-        "size": 12896
+        "sha256": "063cf6cedb16495fa082ed736909accddba6ed970a75d7ed2bb812a2cd8d8814",
+        "size": 12852
       },
       "tools": [
         "render_ui"
