@@ -1,0 +1,50 @@
+{
+  "manifestVersion": 1,
+  "id": "openui-contract",
+  "name": "OpenUI Contract",
+  "version": "0.2.0",
+  "description": "Validates OpenUI Lang specs, and renders them in the dashboard through a sandboxed plugin renderer.",
+  "kind": "in-process",
+  "engines": {
+    "mercury": ">=1.4.0 <2.0.0",
+    "pluginApi": "^1.3.0"
+  },
+  "entry": "index.mjs",
+  "contributes": {
+    "tools": [
+      {
+        "name": "render_ui",
+        "description": "Validate an OpenUI Lang spec before showing it to the user; returns the canonical spec or the exact errors.",
+        "readOnly": true
+      }
+    ],
+    "commands": [
+      {
+        "name": "openui_contract",
+        "description": "Show the OpenUI Lang v1 component allowlist"
+      }
+    ],
+    "renderers": [
+      {
+        "language": "openui",
+        "title": "OpenUI Lang v1",
+        "asset": "renderer/openui.html",
+        "sandbox": "iframe"
+      }
+    ]
+  },
+  "permissions": {
+    "network": [],
+    "secrets": []
+  },
+  "settings": {
+    "version": 1,
+    "fields": {
+      "max_nodes": {
+        "type": "number",
+        "description": "How many components a single spec may contain (default 60, capped at 200)",
+        "default": 60
+      }
+    }
+  }
+}

@@ -1,0 +1,15 @@
+id: daemon-smith
+name: "Daemon smith"
+description: "Implements features and fixes in mercury-agent: daemon, API routes, providers, dashboard."
+enabled: true
+persona: persona.md
+fleetRole: crew
+parent: dev-lead
+memory:
+  scope: "own"
+  learn: true
+comms:
+  canMessage: [dev-lead, reviewer, android-smith, plugin-smith]
+autonomy:
+  maxSteps: 40
+  dailyTokenBudget: 500000

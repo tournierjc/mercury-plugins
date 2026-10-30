@@ -1,0 +1,64 @@
+name: release
+
+# One tag per plugin version: `diff-view-v0.1.1`, `openui-contract-v0.3.0`. The catalog
+# points at that tag's asset URL, so the tag name is part of the contract — Mercury builds
+# the download URL from `<id>-v<version>/<id>-<version>.tgz`.
+on:
+  push:
+    tags:
+      - '*-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the plugin archive
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Resolve plugin from the tag
+        id: tag
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          id="${tag%-v*}"
+          version="${tag##*-v}"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          node -e '
+            const fs = require("node:fs");
+            const id = process.argv[1], version = process.argv[2];
+            const manifest = JSON.parse(fs.readFileSync(`plugins/${id}/mercury-plugin.json`, "utf8"));
+            if (manifest.id !== id) throw new Error(`tag says ${id}, the manifest says ${manifest.id}`);
+            if (manifest.version !== version) throw new Error(`tag says ${version}, the manifest says ${manifest.version}`);
+            console.log(`${manifest.id}@${manifest.version}`);
+          ' "$id" "$version"
+
+      - name: Build and pack
+        run: |
+          node scripts/build.mjs
+          node scripts/pack.mjs
+          node scripts/verify.mjs
+
+      - name: Check the catalog matches this tag
+        run: |
+          node scripts/catalog.mjs
+          if ! git diff --quiet -- catalog.json; then
+            echo "::error::catalog.json does not match this tag — commit it before tagging"
+            git --no-pager diff -- catalog.json
+            exit 1
+          fi
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          archive="dist/${{ steps.tag.outputs.id }}-${{ steps.tag.outputs.version }}.tgz"
+          gh release create "$GITHUB_REF_NAME" "$archive" \
+            --title "${{ steps.tag.outputs.id }} ${{ steps.tag.outputs.version }}" \
+            --notes "Mercury plugin \`${{ steps.tag.outputs.id }}\` version ${{ steps.tag.outputs.version }}. Install with \`mercury plugins install github:tournierjc/mercury-plugins\` once this tag is the latest release, or straight from the catalog."

@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  plugins:
+    name: Build, test and verify every plugin
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # No install step: the plugins and these scripts have no dependencies. That is a rule,
+      # not an accident — an in-process plugin must be one bundled file, so it can never
+      # bring a package into Mercury's binary, and packaging should not need one either.
+      - name: Build
+        run: node scripts/build.mjs
+
+      - name: Plugin contract tests
+        run: node scripts/test.mjs
+
+      - name: Pack archives
+        run: node scripts/pack.mjs
+
+      - name: Regenerate the catalog
+        run: node scripts/catalog.mjs
+
+      - name: Verify packages and catalog
+        run: node scripts/verify.mjs
+
+      # A catalog that does not match the plugins is how an install silently gets the wrong
+      # bytes: the entry would point at a version the archives no longer hold.
+      - name: Catalog is up to date
+        run: |
+          if ! git diff --quiet -- catalog.json; then
+            echo "::error::catalog.json is stale — run 'node scripts/catalog.mjs' and commit it"
+            git --no-pager diff -- catalog.json
+            exit 1
+          fi

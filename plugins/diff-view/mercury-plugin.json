@@ -1,0 +1,29 @@
+{
+  "manifestVersion": 1,
+  "id": "diff-view",
+  "name": "Diff View",
+  "version": "0.1.0",
+  "description": "Draws a ```diff fenced block as a coloured unified diff in the dashboard. No tool, no network: one sandboxed renderer.",
+  "kind": "in-process",
+  "engines": {
+    "mercury": ">=1.4.0 <2.0.0",
+    "pluginApi": "^1.3.0"
+  },
+  "entry": "index.mjs",
+  "contributes": {
+    "tools": [],
+    "commands": [],
+    "renderers": [
+      {
+        "language": "diff",
+        "title": "Unified diff",
+        "asset": "renderer/diff.html",
+        "sandbox": "iframe"
+      }
+    ]
+  },
+  "permissions": {
+    "network": [],
+    "secrets": []
+  }
+}

@@ -1,0 +1,6 @@
+paths:
+  - scope: self
+    read: true
+    write: true
+tools:
+  deny: [write_file, edit_file, delete_file, run_command, git_commit, git_push]

@@ -1,0 +1,15 @@
+id: reviewer
+name: "Reviewer"
+description: "Reads the smiths' diffs, runs their suites, reports findings with file:line. Never edits."
+enabled: true
+persona: persona.md
+fleetRole: crew
+parent: dev-lead
+memory:
+  scope: "own"
+  learn: true
+comms:
+  canMessage: [dev-lead, daemon-smith, android-smith, plugin-smith]
+autonomy:
+  maxSteps: 30
+  dailyTokenBudget: 400000

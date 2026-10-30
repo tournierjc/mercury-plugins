@@ -1,0 +1,15 @@
+id: plugin-smith
+name: "Plugin smith"
+description: "Owns mercury-plugins: manifests, wire contracts, renderers, packaging and the catalog."
+enabled: true
+persona: persona.md
+fleetRole: crew
+parent: dev-lead
+memory:
+  scope: "own"
+  learn: true
+comms:
+  canMessage: [dev-lead, reviewer, daemon-smith, android-smith]
+autonomy:
+  maxSteps: 40
+  dailyTokenBudget: 400000

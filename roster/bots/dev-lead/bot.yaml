@@ -1,0 +1,15 @@
+id: dev-lead
+name: "Dev lead"
+description: "Cuts a development goal into stages, hands each to the smith who owns that repository, and reports once at the end."
+enabled: true
+persona: persona.md
+fleetRole: lead
+memory:
+  scope: "shared-read"
+  learn: true
+  allowCrossBotRecall: ["daemon-smith", "android-smith", "plugin-smith", "reviewer"]
+comms:
+  canMessage: [daemon-smith, android-smith, plugin-smith, reviewer]
+autonomy:
+  maxSteps: 30
+  dailyTokenBudget: 400000

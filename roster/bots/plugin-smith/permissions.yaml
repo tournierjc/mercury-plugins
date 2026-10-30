@@ -1,0 +1,20 @@
+paths:
+  - scope: __ROOT__/mercury-plugins
+    read: true
+    write: true
+    execute: true
+  - scope: self
+    read: true
+    write: true
+autoApproveCommands:
+  - "node *"
+  - "npm test"
+  - "npm run *"
+  - "npx *"
+  - "rg *"
+  - "git status *"
+  - "git diff *"
+  - "git log *"
+  - "git show *"
+tools:
+  deny: [git_push, delete_file]

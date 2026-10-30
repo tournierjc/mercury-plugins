@@ -1,0 +1,18 @@
+paths:
+  - scope: __ROOT__/mercury-android
+    read: true
+    write: true
+    execute: true
+  - scope: self
+    read: true
+    write: true
+autoApproveCommands:
+  - "./gradlew *"
+  - "gradle *"
+  - "rg *"
+  - "git status *"
+  - "git diff *"
+  - "git log *"
+  - "git show *"
+tools:
+  deny: [git_push, delete_file]

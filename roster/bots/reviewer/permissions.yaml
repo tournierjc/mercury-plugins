@@ -1,0 +1,19 @@
+paths:
+  - scope: __ROOT__/mercury-agent
+    read: true
+  - scope: __ROOT__/mercury-android
+    read: true
+  - scope: __ROOT__/mercury-plugins
+    read: true
+autoApproveCommands:
+  - "npm test"
+  - "npm run typecheck"
+  - "npm run lint:ratchet"
+  - "node scripts/*"
+  - "rg *"
+  - "git status *"
+  - "git diff *"
+  - "git log *"
+  - "git show *"
+tools:
+  deny: [write_file, edit_file, delete_file, git_commit, git_push]

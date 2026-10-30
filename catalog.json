@@ -1,0 +1,54 @@
+{
+  "catalogVersion": 1,
+  "updatedAt": "2026-10-30T07:54:47Z",
+  "plugins": [
+    {
+      "id": "diff-view",
+      "name": "Diff View",
+      "description": "Draws a ```diff fenced block as a coloured unified diff in the dashboard. No tool, no network: one sandboxed renderer.",
+      "version": "0.1.0",
+      "kind": "in-process",
+      "tier": "community",
+      "homepage": "https://github.com/tournierjc/mercury-plugins/tree/main/plugins/diff-view",
+      "engines": {
+        "mercury": ">=1.4.0 <2.0.0",
+        "pluginApi": "^1.3.0"
+      },
+      "artifact": {
+        "url": "https://github.com/tournierjc/mercury-plugins/releases/download/diff-view-v0.1.0/diff-view-0.1.0.tgz",
+        "sha256": "e52637c87fe5ff7a2bb4a2dc96cc7fdbb790d8a5da230000fd69051c3ab2cf7c",
+        "size": 4596
+      },
+      "tools": [],
+      "permissions": {
+        "network": [],
+        "secrets": []
+      }
+    },
+    {
+      "id": "openui-contract",
+      "name": "OpenUI Contract",
+      "description": "Validates OpenUI Lang specs, and renders them in the dashboard through a sandboxed plugin renderer.",
+      "version": "0.2.0",
+      "kind": "in-process",
+      "tier": "community",
+      "homepage": "https://github.com/tournierjc/mercury-plugins/tree/main/plugins/openui-contract",
+      "engines": {
+        "mercury": ">=1.4.0 <2.0.0",
+        "pluginApi": "^1.3.0"
+      },
+      "artifact": {
+        "url": "https://github.com/tournierjc/mercury-plugins/releases/download/openui-contract-v0.2.0/openui-contract-0.2.0.tgz",
+        "sha256": "26e5c5bba46f2e98b6ebddfbe9463fd8ae5e4c41a9e8f5fd5fd9608ce4274d25",
+        "size": 12896
+      },
+      "tools": [
+        "render_ui"
+      ],
+      "permissions": {
+        "network": [],
+        "secrets": []
+      }
+    }
+  ]
+}

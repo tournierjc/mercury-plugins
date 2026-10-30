@@ -1,0 +1,17 @@
+{
+  "name": "mercury-plugins",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Mercury plugins, and the development roster that uses them",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs",
+    "pack": "node scripts/pack.mjs",
+    "catalog": "node scripts/catalog.mjs",
+    "verify": "node scripts/verify.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

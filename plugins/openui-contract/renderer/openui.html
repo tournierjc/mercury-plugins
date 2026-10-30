@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<!-- Defense in depth: the route also sends this as a header, which a meta tag can only tighten. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>OpenUI</title>
+<style>
+  :root {
+    --text: #e8e8e6;
+    --muted: #8b98aa;
+    --surface: #0f1720;
+    --border: #1d2530;
+    --accent: #00d4ff;
+    --danger: #ff6b6b;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  /* The host owns the height, so the frame must never scroll on its own. */
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  body {
+    color: var(--text);
+    font: 13px/1.5 -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root { display: block; }
+  .stack { display: flex; flex-direction: column; gap: 10px; }
+  .card {
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 60%, transparent);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .card.tone-ok { border-left: 3px solid #3fb950; }
+  .card.tone-warn { border-left: 3px solid #d29922; }
+  .card.tone-danger { border-left: 3px solid var(--danger); }
+  .card-title { font-weight: 600; margin-bottom: 4px; }
+  .text { margin: 0; }
+  h2.text { font-size: 15px; font-weight: 650; }
+  h3.text { font-size: 14px; font-weight: 650; }
+  .muted { color: var(--muted); }
+  .small { font-size: 11px; }
+  .accent { color: var(--accent); }
+  .strong { font-weight: 600; }
+  .mono { font-family: var(--mono); }
+  .unit { color: var(--muted); font-size: 11px; margin-bottom: 6px; }
+  .kv { display: flex; justify-content: space-between; gap: 16px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+  .kv:last-child { border-bottom: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  caption { text-align: left; font-size: 11px; padding-bottom: 6px; }
+  th {
+    text-align: left; font-weight: 500; color: var(--muted);
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  td { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent); }
+  tbody tr:last-child td { border-bottom: 0; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  ul, ol { margin: 0; padding-left: 18px; }
+  li { padding: 2px 0; }
+  .stat { display: flex; align-items: baseline; gap: 8px; }
+  .stat-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat-value.tone-ok { color: #3fb950; }
+  .stat-value.tone-warn { color: #d29922; }
+  .stat-value.tone-danger { color: var(--danger); }
+  .code { padding: 0; overflow: hidden; }
+  .code-bar { display: flex; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+  /* Code wraps rather than scrolls: in a chat column a clipped command is worse than a
+     wrapped one, and a nested scroll area inside a sandboxed frame is a trap. */
+  pre { margin: 0; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12px; line-height: 1.6; }
+  .pending { color: var(--muted); font-family: var(--mono); font-size: 11px; padding: 2px 0; }
+</style>
+</head>
+<body>
+<div id="root"><div class="pending">…</div></div>
+<script>(() => {
+  // src/parse.js
+  var COMPONENTS = {
+    Stack: { children: true, props: {} },
+    Text: { props: { text: "string", variant: ["body", "h1", "h2", "h3", "mono"], muted: "boolean" } },
+    Card: { props: { title: "string", body: "string", tone: ["neutral", "ok", "warn", "danger"] } },
+    KeyValue: { props: { label: "string", value: "string", highlight: "boolean" } },
+    Table: { props: { columns: "string[]", rows: "string[][]", caption: "string" } },
+    List: { props: { items: "string[]", ordered: "boolean" } },
+    Stat: { props: { label: "string", value: "string", delta: "string", tone: ["neutral", "ok", "warn", "danger"] } },
+    Code: { props: { code: "code", language: "string", title: "string" } },
+    Chart: { props: { kind: ["bar", "line"], labels: "string[]", values: "number[]", title: "string", unit: "string" } }
+  };
+  var FORBIDDEN_PROPS = /* @__PURE__ */ new Set([
+    "href",
+    "url",
+    "uri",
+    "src",
+    "srcset",
+    "html",
+    "innerhtml",
+    "script",
+    "style",
+    "onclick",
+    "onload",
+    "onerror",
+    "action",
+    "formaction",
+    "image",
+    "img",
+    "svg",
+    "iframe",
+    "embed",
+    "object",
+    "data",
+    "background",
+    "class",
+    "classname"
+  ]);
+  var ID = /^[a-z][a-z0-9_]{0,23}$/;
+  var STATEMENT = /^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([A-Z][A-Za-z0-9]*)\s*\(([\s\S]*)\)$/;
+  var LIMITS = { string: 1200, code: 4e3, items: 60, nodes: 60, bytes: 32768 };
+  function parseIds(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith("[") || !trimmed.endsWith("]")) return null;
+    const inner = trimmed.slice(1, -1).trim();
+    if (inner === "") return [];
+    return inner.split(",").map((part) => part.trim());
+  }
+  function checkValue(name, value, rule, line) {
+    if (rule === "string") {
+      if (typeof value !== "string") return [{ line, code: "bad_type", message: `${name} must be a string` }];
+      if (value.length > LIMITS.string) return [{ line, code: "string_too_long", message: `${name} is ${value.length} characters; the limit is ${LIMITS.string}` }];
+      return [];
+    }
+    if (rule === "code") {
+      if (typeof value !== "string") return [{ line, code: "bad_type", message: `${name} must be a string` }];
+      if (value.length > LIMITS.code) return [{ line, code: "string_too_long", message: `${name} is ${value.length} characters; the limit is ${LIMITS.code}` }];
+      return [];
+    }
+    if (rule === "boolean") {
+      if (typeof value !== "boolean") return [{ line, code: "bad_type", message: `${name} must be true or false` }];
+      return [];
+    }
+    if (rule === "string[]") {
+      if (!Array.isArray(value)) return [{ line, code: "bad_type", message: `${name} must be a list of strings` }];
+      if (value.length > LIMITS.items) return [{ line, code: "array_too_long", message: `${name} has ${value.length} items; the limit is ${LIMITS.items}` }];
+      for (const item of value) {
+        if (typeof item !== "string") return [{ line, code: "bad_type", message: `${name} must only contain strings` }];
+        if (item.length > LIMITS.string) return [{ line, code: "string_too_long", message: `${name} has an item of ${item.length} characters` }];
+      }
+      return [];
+    }
+    if (rule === "string[][]") {
+      if (!Array.isArray(value)) return [{ line, code: "bad_type", message: `${name} must be a list of rows` }];
+      if (value.length > LIMITS.items) return [{ line, code: "array_too_long", message: `${name} has ${value.length} rows` }];
+      for (const row of value) {
+        if (!Array.isArray(row)) return [{ line, code: "bad_type", message: `${name} must contain rows of strings` }];
+        if (row.length > 20) return [{ line, code: "array_too_long", message: `${name} has a row of ${row.length} cells; the limit is 20` }];
+        for (const cell of row) {
+          if (typeof cell !== "string") return [{ line, code: "bad_type", message: `${name} must only contain strings` }];
+          if (cell.length > LIMITS.string) return [{ line, code: "string_too_long", message: `${name} has a cell of ${cell.length} characters` }];
+        }
+      }
+      return [];
+    }
+    if (rule === "number[]") {
+      if (!Array.isArray(value)) return [{ line, code: "bad_type", message: `${name} must be a list of numbers` }];
+      if (value.length > LIMITS.items) return [{ line, code: "array_too_long", message: `${name} has ${value.length} values; the limit is ${LIMITS.items}` }];
+      for (const item of value) {
+        if (typeof item !== "number" || !Number.isFinite(item)) return [{ line, code: "bad_type", message: `${name} must only contain finite numbers` }];
+      }
+      return [];
+    }
+    if (Array.isArray(rule)) {
+      if (typeof value !== "string") return [{ line, code: "bad_type", message: `${name} must be one of: ${rule.join(", ")}` }];
+      if (!rule.includes(value)) return [{ line, code: "bad_enum", message: `${name} must be one of: ${rule.join(", ")}` }];
+      return [];
+    }
+    return [];
+  }
+  function checkArgs(statement, definition, line) {
+    const errors = [];
+    const { id, component, args } = statement;
+    if (definition.children) {
+      if (!Array.isArray(args)) {
+        errors.push({ line, code: "bad_args", message: `"${component}" takes a list of child ids, e.g. ${id} = ${component}([a, b])` });
+        return errors;
+      }
+      if (args.length === 0) errors.push({ line, code: "bad_args", message: `"${component}" needs at least one child` });
+      for (const child of args) {
+        if (typeof child !== "string" || !ID.test(child)) {
+          errors.push({ line, code: "bad_ref", message: `"${id}" has a child that is not an id: ${JSON.stringify(child)}` });
+        }
+      }
+      return errors;
+    }
+    if (args === null || typeof args !== "object" || Array.isArray(args)) {
+      errors.push({ line, code: "bad_args", message: `"${component}" takes one JSON object of props` });
+      return errors;
+    }
+    for (const [key, value] of Object.entries(args)) {
+      if (FORBIDDEN_PROPS.has(key.toLowerCase())) {
+        errors.push({ line, code: "forbidden_prop", message: `"${key}" is never allowed: a spec may not point a client at a URL, a script or a style` });
+        continue;
+      }
+      const rule = definition.props[key];
+      if (rule === void 0) {
+        errors.push({ line, code: "unknown_prop", message: `"${key}" is not a ${component} prop; allowed: ${Object.keys(definition.props).join(", ") || "(none)"}` });
+        continue;
+      }
+      errors.push(...checkValue(`${component}.${key}`, value, rule, line));
+    }
+    return errors;
+  }
+  function childRefs(statement) {
+    return Array.isArray(statement.args) ? statement.args.filter((child) => typeof child === "string") : [];
+  }
+  function collect(spec, options) {
+    const errors = [];
+    const nodes = /* @__PURE__ */ new Map();
+    const order = [];
+    const lines = spec.split(/\r?\n/);
+    lines.forEach((rawLine, index) => {
+      const raw = rawLine.trim();
+      const line = index + 1;
+      if (raw === "" || raw.startsWith("//") || raw.startsWith("#")) return;
+      const isLastLine = index === lines.length - 1;
+      const match = STATEMENT.exec(raw);
+      if (!match) {
+        if (!(options.partial && isLastLine)) errors.push({ line, code: "syntax", message: "expected `id = Component(args)` on one line" });
+        return;
+      }
+      const [, id, component, rawArgs] = match;
+      if (!ID.test(id)) {
+        errors.push({ line, code: "bad_id", message: `"${id}" is not an id (lowercase, digits, _, max 24, starting with a letter)` });
+        return;
+      }
+      if (nodes.has(id)) {
+        errors.push({ line, code: "duplicate_id", message: `"${id}" is defined twice` });
+        return;
+      }
+      const definition = COMPONENTS[component];
+      if (!definition) {
+        errors.push({ line, code: "unknown_component", message: `"${component}" is not in the contract; allowed: ${Object.keys(COMPONENTS).join(", ")}` });
+        return;
+      }
+      let args;
+      if (definition.children) {
+        const parsed = parseIds(rawArgs);
+        if (parsed === null) {
+          if (!(options.partial && isLastLine)) errors.push({ line, code: "bad_ref", message: "a layout takes a list of child ids, e.g. Stack([a, b])" });
+          return;
+        }
+        args = parsed;
+      } else {
+        try {
+          args = JSON.parse(rawArgs);
+        } catch (error) {
+          if (!(options.partial && isLastLine)) errors.push({ line, code: "bad_json", message: `arguments are not valid JSON: ${error.message}` });
+          return;
+        }
+      }
+      const statement = { id, component, args };
+      const argErrors = checkArgs(statement, definition, line);
+      errors.push(...argErrors);
+      if (argErrors.length === 0) {
+        nodes.set(id, statement);
+        order.push(statement);
+      }
+    });
+    return { errors, nodes, order, lines };
+  }
+  function findCycle(nodes) {
+    const done = /* @__PURE__ */ new Set();
+    const walk = (id, path) => {
+      if (path.includes(id)) return [...path.slice(path.indexOf(id)), id];
+      if (done.has(id)) return null;
+      const statement = nodes.get(id);
+      if (!statement) return null;
+      for (const child of childRefs(statement)) {
+        const found = walk(child, [...path, id]);
+        if (found) return found;
+      }
+      done.add(id);
+      return null;
+    };
+    for (const id of nodes.keys()) {
+      const found = walk(id, []);
+      if (found) return found;
+    }
+    return null;
+  }
+  function validateSpec(spec, options = {}) {
+    const maxNodes = Number.isFinite(options.maxNodes) ? Number(options.maxNodes) : LIMITS.nodes;
+    const maxBytes = Number.isFinite(options.maxBytes) ? Number(options.maxBytes) : LIMITS.bytes;
+    if (typeof spec !== "string" || spec.trim() === "") {
+      return { ok: false, errors: [{ line: 0, code: "empty", message: "the spec is empty" }], nodes: 0, canonical: "", order: [] };
+    }
+    if (new TextEncoder().encode(spec).length > maxBytes) {
+      return { ok: false, errors: [{ line: 0, code: "too_large", message: `the spec is over ${maxBytes} bytes` }], nodes: 0, canonical: "", order: [] };
+    }
+    const { errors, nodes, order, lines } = collect(spec, { partial: options.partial === true });
+    const lineOf = (id) => lines.findIndex((line) => new RegExp(`^\\s*${id}\\s*=`).test(line)) + 1;
+    if (nodes.size > maxNodes) errors.push({ line: 0, code: "too_many_nodes", message: `${nodes.size} nodes; the limit is ${maxNodes}` });
+    if (errors.length === 0 && options.partial !== true) {
+      if (!nodes.has("root")) errors.push({ line: 0, code: "no_root", message: "a spec needs root = Stack([...]) or another component" });
+      for (const statement of order) {
+        for (const ref of childRefs(statement)) {
+          if (!nodes.has(ref)) errors.push({ line: lineOf(statement.id), code: "dangling_ref", message: `"${statement.id}" points at "${ref}", which is not defined` });
+        }
+      }
+      const referenced = new Set(order.flatMap((statement) => childRefs(statement)));
+      for (const statement of order) {
+        if (statement.id !== "root" && !referenced.has(statement.id)) {
+          errors.push({ line: lineOf(statement.id), code: "orphan", message: `"${statement.id}" is never referenced` });
+        }
+      }
+      const cycle = findCycle(nodes);
+      if (cycle) errors.push({ line: 0, code: "cycle", message: `children form a cycle through ${cycle.join(" \u2192 ")}` });
+    }
+    if (errors.length > 0) return { ok: false, errors, nodes: nodes.size, canonical: "", order };
+    return { ok: true, errors: [], nodes: nodes.size, canonical: canonicalise(order), order };
+  }
+  function canonicalise(order) {
+    const sorted = [...order].sort((a, b) => a.id === "root" ? 1 : b.id === "root" ? -1 : a.id.localeCompare(b.id));
+    return sorted.map((statement) => {
+      if (Array.isArray(statement.args)) return `${statement.id} = ${statement.component}([${statement.args.join(", ")}])`;
+      const props = Object.fromEntries(Object.entries(statement.args).sort(([a], [b]) => a.localeCompare(b)));
+      return `${statement.id} = ${statement.component}(${JSON.stringify(props)})`;
+    }).join("\n");
+  }
+  function buildTree(nodes, id = "root", seen = /* @__PURE__ */ new Set()) {
+    if (seen.has(id)) return null;
+    const statement = nodes.get(id);
+    if (!statement) return null;
+    const props = statement.args && !Array.isArray(statement.args) ? statement.args : {};
+    const str = (key) => typeof props[key] === "string" ? props[key] : void 0;
+    const flag = (key) => props[key] === true;
+    const list = (key) => Array.isArray(props[key]) ? props[key] : [];
+    switch (statement.component) {
+      case "Stack":
+        return { type: "Stack", children: statement.args.map((child) => buildTree(nodes, child, new Set(seen))).filter(Boolean) };
+      case "Text":
+        return { type: "Paragraph", text: str("text") ?? "", variant: str("variant") ?? "body", muted: flag("muted") };
+      case "Card":
+        return { type: "Card", title: str("title"), body: str("body"), tone: str("tone") ?? "neutral" };
+      case "KeyValue":
+        return { type: "KeyValue", label: str("label") ?? "", value: str("value") ?? "", highlight: flag("highlight") };
+      case "Table":
+        return { type: "Table", columns: list("columns"), rows: list("rows"), caption: str("caption") };
+      case "List":
+        return { type: "Bullets", items: list("items"), ordered: flag("ordered") };
+      case "Stat":
+        return { type: "Stat", value: str("value") ?? "", label: str("label") ?? "", delta: str("delta"), tone: str("tone") ?? "neutral" };
+      case "Code":
+        return { type: "Snippet", code: str("code") ?? "", language: str("language") ?? "text", title: str("title") };
+      case "Chart":
+        return {
+          type: "Chart",
+          kind: str("kind") === "line" ? "line" : "bar",
+          labels: list("labels"),
+          values: list("values"),
+          title: str("title"),
+          unit: str("unit")
+        };
+      default:
+        return null;
+    }
+  }
+  function renderSpec(spec, options = {}) {
+    const result = validateSpec(spec, options);
+    if (!result.ok) return result;
+    const nodes = new Map(result.order.map((statement) => [statement.id, statement]));
+    return { ...result, tree: buildTree(nodes) };
+  }
+  var EXAMPLE = [
+    "root = Stack([title, counts, fleet, latency, snippet])",
+    'title = Text({"text": "Fleet du matin", "variant": "h2"})',
+    'counts = KeyValue({"label": "\xC9quipiers en attente", "value": "2", "highlight": true})',
+    'fleet = Table({"columns": ["Bot", "\xC9tat", "Dernier passage"], "rows": [["CEO", "attente", "il y a 4 min"], ["Dev", "ok", "il y a 1 h"]]})',
+    'latency = Chart({"kind": "line", "title": "Latence p95", "unit": "ms", "labels": ["09:00", "10:00", "11:00", "12:00"], "values": [180, 245, 210, 165]})',
+    `snippet = Code({"language": "bash", "title": "Relancer l'\xE9quipier", "code": "mercury bots restart ceo"})`
+  ].join("\n");
+
+  // src/renderer.js
+  var HOST = window.parent;
+  var theme = null;
+  var lastSignature = "";
+  var lastPayload = null;
+  var lastWidth = 0;
+  var el = (tag, props = {}, ...children) => {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (value === void 0 || value === null || value === "") continue;
+      if (key === "style") Object.assign(node.style, value);
+      else if (key === "class") node.className = value;
+      else node.setAttribute(key, String(value));
+    }
+    for (const child of children.flat()) {
+      if (child === null || child === void 0) continue;
+      node.append(typeof child === "string" ? document.createTextNode(child) : child);
+    }
+    return node;
+  };
+  function reportHeight() {
+    const px = Math.ceil(document.body.getBoundingClientRect().height) + 2;
+    HOST.postMessage({ v: 1, type: "height", px }, "*");
+  }
+  function money(number) {
+    return Number.isFinite(number) ? String(Math.round(number)) : "0";
+  }
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const power = 10 ** Math.floor(Math.log10(raw));
+    const fraction = raw / power;
+    const nice = fraction <= 1 ? 1 : fraction <= 2 ? 2 : fraction <= 5 ? 5 : 10;
+    return nice * power;
+  }
+  function chart(node) {
+    const width = Math.max(240, Math.round(document.body.clientWidth || 640));
+    const height = 170;
+    const pad = { top: 10, right: 16, bottom: 22, left: 40 };
+    const values = (node.values || []).map(Number).filter(Number.isFinite);
+    const dataMax = Math.max(...values, 1);
+    const step = niceStep(Math.max(dataMax / 4, 1));
+    const max = Math.ceil(dataMax / step) * step;
+    const ticks = [];
+    for (let value = 0; value <= max + 1e-9; value += step) ticks.push(value);
+    const plotWidth = width - pad.left - pad.right;
+    const plotHeight = height - pad.top - pad.bottom;
+    const y = (value) => pad.top + (1 - value / max) * plotHeight;
+    const slot = plotWidth / Math.max(values.length, 1);
+    const barWidth = Math.min(38, slot * 0.55);
+    const svgNs = "http://www.w3.org/2000/svg";
+    const svgNode = (tag, attrs, text) => {
+      const item = document.createElementNS(svgNs, tag);
+      for (const [key, value] of Object.entries(attrs)) if (value !== void 0) item.setAttribute(key, String(value));
+      if (text !== void 0) item.textContent = text;
+      return item;
+    };
+    const svg = document.createElementNS(svgNs, "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", node.title || "chart");
+    for (const tick of ticks) {
+      svg.append(svgNode("line", { x1: pad.left, x2: width - pad.right, y1: y(tick), y2: y(tick), stroke: theme.border, "stroke-width": 1 }));
+      svg.append(svgNode("text", { x: pad.left - 8, y: y(tick) + 3.5, "text-anchor": "end", fill: theme.muted, "font-size": 11, "font-family": theme.mono }, money(tick)));
+    }
+    if (node.kind === "line") {
+      const points = values.map((value, index) => {
+        const x = values.length === 1 ? pad.left + plotWidth / 2 : pad.left + plotWidth / (values.length - 1) * index;
+        return `${x},${y(value)}`;
+      });
+      svg.append(svgNode("polyline", { points: points.join(" "), fill: "none", stroke: theme.accent, "stroke-width": 2, "stroke-linejoin": "round" }));
+      values.forEach((value, index) => {
+        const x = values.length === 1 ? pad.left + plotWidth / 2 : pad.left + plotWidth / (values.length - 1) * index;
+        svg.append(svgNode("circle", { cx: x, cy: y(value), r: 3.5, fill: theme.surface, stroke: theme.accent, "stroke-width": 2 }));
+      });
+    } else {
+      values.forEach((value, index) => {
+        const left = pad.left + slot * index + (slot - barWidth) / 2;
+        const top = y(value);
+        svg.append(svgNode("rect", { x: left, y: top, width: barWidth, height: Math.max(1, pad.top + plotHeight - top), rx: 4, fill: theme.accent }));
+      });
+    }
+    (node.labels || []).forEach((label, index) => {
+      const x = node.kind === "line" ? values.length === 1 ? pad.left + plotWidth / 2 : pad.left + plotWidth / (values.length - 1) * index : pad.left + slot * index + slot / 2;
+      const anchor = index === 0 ? "start" : index === node.labels.length - 1 ? "end" : "middle";
+      svg.append(svgNode("text", { x, y: height - 6, "text-anchor": anchor, fill: theme.muted, "font-size": 11, "font-family": theme.mono }, label));
+    });
+    return el(
+      "div",
+      { class: "card" },
+      node.title ? el("div", { class: "card-title" }, node.title) : null,
+      node.unit ? el("div", { class: "unit" }, `en ${node.unit}`) : null,
+      svg
+    );
+  }
+  function numericColumn(rows, index) {
+    return rows.length > 0 && rows.every((row) => /^-?\d+([.,]\d+)?$/.test(String(row[index] ?? "").trim()));
+  }
+  function nodeView(node) {
+    switch (node.type) {
+      case "Stack":
+        return el("div", { class: "stack" }, node.children.map(nodeView));
+      case "Paragraph": {
+        const tag = node.variant === "h1" ? "h1" : node.variant === "h2" ? "h2" : node.variant === "h3" ? "h3" : "p";
+        return el(tag, { class: `text ${node.variant}${node.muted ? " muted" : ""}` }, node.text);
+      }
+      case "Card":
+        return el(
+          "div",
+          { class: `card${node.tone && node.tone !== "neutral" ? ` tone-${node.tone}` : ""}` },
+          node.title ? el("div", { class: "card-title" }, node.title) : null,
+          node.body ? el("div", { class: "muted" }, node.body) : null
+        );
+      case "KeyValue":
+        return el(
+          "div",
+          { class: "kv" },
+          el("span", { class: "muted" }, node.label),
+          el("span", { class: node.highlight ? "accent strong" : "" }, node.value)
+        );
+      case "Table": {
+        const rows = node.rows || [];
+        const table = el(
+          "table",
+          {},
+          node.caption ? el("caption", { class: "muted" }, node.caption) : null,
+          el("thead", {}, el("tr", {}, (node.columns || []).map((title, index) => el("th", { class: numericColumn(rows, index) ? "num" : "" }, title)))),
+          el("tbody", {}, rows.map((row) => el("tr", {}, (node.columns || []).map((_, index) => el("td", { class: numericColumn(rows, index) ? "num" : "" }, row[index] ?? "")))))
+        );
+        return el("div", { class: "card" }, table);
+      }
+      case "Bullets":
+        return el(
+          "div",
+          { class: "card" },
+          el(node.ordered ? "ol" : "ul", {}, (node.items || []).map((item) => el("li", {}, item)))
+        );
+      case "Stat":
+        return el(
+          "div",
+          { class: "card" },
+          el(
+            "div",
+            { class: "stat" },
+            el("span", { class: `stat-value${node.tone && node.tone !== "neutral" ? ` tone-${node.tone}` : ""}` }, node.value),
+            node.delta ? el("span", { class: "muted small" }, node.delta) : null
+          ),
+          el("div", { class: "muted small" }, node.label)
+        );
+      case "Snippet":
+        return el(
+          "div",
+          { class: "card code" },
+          el(
+            "div",
+            { class: "code-bar" },
+            el("span", { class: "muted small" }, node.title || ""),
+            el("span", { class: "muted small mono" }, node.language || "text")
+          ),
+          el("pre", {}, node.code)
+        );
+      case "Chart":
+        return chart(node);
+      default:
+        return null;
+    }
+  }
+  function draw(payload) {
+    lastPayload = payload;
+    lastWidth = document.body.clientWidth;
+    theme = payload.theme || { text: "#e8e8e6", muted: "#8b98aa", surface: "#0f1720", border: "#1d2530", accent: "#00d4ff", danger: "#ff6b6b", mono: "monospace", dark: true };
+    document.documentElement.style.setProperty("--text", theme.text);
+    document.documentElement.style.setProperty("--muted", theme.muted);
+    document.documentElement.style.setProperty("--surface", theme.surface);
+    document.documentElement.style.setProperty("--border", theme.border);
+    document.documentElement.style.setProperty("--accent", theme.accent);
+    document.documentElement.style.setProperty("--danger", theme.danger);
+    const partial = payload.complete === false;
+    const result = renderSpec(payload.text || "", { partial });
+    const signature = JSON.stringify(result.ok ? result.tree : result.errors);
+    if (signature === lastSignature) return;
+    lastSignature = signature;
+    const root = document.getElementById("root");
+    root.replaceChildren();
+    if (result.ok && result.tree) {
+      root.append(nodeView(result.tree));
+    } else if (partial) {
+      root.append(el("div", { class: "pending" }, "\u2026"));
+    } else {
+      const reason = result.errors && result.errors[0]?.message || "spec refus\xE9e";
+      HOST.postMessage({ v: 1, type: "error", message: reason }, "*");
+      root.append(el("div", { class: "card muted small" }, `openui \u2014 non rendu : ${reason}`));
+    }
+    reportHeight();
+  }
+  window.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.v !== 1) return;
+    if (data.type === "render") draw(data);
+  });
+  new ResizeObserver(() => {
+    if (!lastPayload) return reportHeight();
+    if (document.body.clientWidth !== lastWidth) {
+      lastSignature = "";
+      draw(lastPayload);
+      return;
+    }
+    reportHeight();
+  }).observe(document.body);
+  HOST.postMessage({ v: 1, type: "ready" }, "*");
+})();
+</script>
+</body>
+</html>
