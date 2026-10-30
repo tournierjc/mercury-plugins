@@ -7,9 +7,9 @@ fleetRole: lead
 memory:
   scope: "shared-read"
   learn: true
-  allowCrossBotRecall: ["daemon-smith", "android-smith", "plugin-smith", "reviewer"]
+  allowCrossBotRecall: ["daemon-smith", "plugin-smith", "reviewer"]
 comms:
-  canMessage: [daemon-smith, android-smith, plugin-smith, reviewer]
+  canMessage: [daemon-smith, plugin-smith, reviewer]
 autonomy:
   maxSteps: 30
   dailyTokenBudget: 400000

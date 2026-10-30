@@ -1,14 +1,15 @@
 # The development roster
 
-Five bots, one fleet: a lead that cuts the work, three smiths that own one repository each,
-and a reviewer that reads what they produced. They are plain Mercury bots — a folder with
+Four bots, one fleet for **Mercury itself**: a lead that cuts the work, two smiths that own
+one repository each, and a reviewer that reads what they produced. The Android client has its
+own fleet (`mac-lead`) — a change that touches both sides is two fleets talking to each other,
+not one fleet spanning both. They are plain Mercury bots — a folder with
 `bot.yaml`, `persona.md` and `permissions.yaml` — so nothing here is a new mechanism: this is
 the fleet layout, written down and reproducible.
 
 ```
 dev-lead                 the only bot you talk to
 ├── daemon-smith         mercury-agent      (TypeScript, the daemon and the dashboard)
-├── android-smith        mercury-android    (Kotlin, Compose)
 ├── plugin-smith         mercury-plugins    (plugin manifests and wire contracts)
 └── reviewer             reads diffs, runs the suites, reports — never edits
 ```

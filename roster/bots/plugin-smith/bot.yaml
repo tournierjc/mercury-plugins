@@ -9,7 +9,7 @@ memory:
   scope: "own"
   learn: true
 comms:
-  canMessage: [dev-lead, reviewer, daemon-smith, android-smith]
+  canMessage: [dev-lead, reviewer, daemon-smith]
 autonomy:
   maxSteps: 40
   dailyTokenBudget: 400000

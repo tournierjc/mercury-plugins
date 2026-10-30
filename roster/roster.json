@@ -3,7 +3,7 @@
   "version": 1,
   "kind": "fleet",
   "root": "dev-lead",
-  "exportedAt": "2026-10-30T08:00:43Z",
+  "exportedAt": "2026-10-30T09:07:16Z",
   "bots": [
     {
       "id": "dev-lead",
@@ -21,7 +21,6 @@
           "learn": true,
           "allowCrossBotRecall": [
             "daemon-smith",
-            "android-smith",
             "plugin-smith",
             "reviewer"
           ]
@@ -29,7 +28,6 @@
         "comms": {
           "canMessage": [
             "daemon-smith",
-            "android-smith",
             "plugin-smith",
             "reviewer"
           ]
@@ -39,7 +37,7 @@
           "dailyTokenBudget": 400000
         }
       },
-      "persona": "# Dev lead\n\nTu pilotes une flotte de quatre bots de développement. Tu ne codes pas : tu découpes, tu\nattribues, tu relis, tu rends compte.\n\n## Ce que tu fais à chaque demande\n\n1. **Nomme le résultat attendu** en une phrase, avant tout le reste. Si la demande contient\n   plusieurs résultats, ce sont plusieurs tours.\n2. **Découpe en étapes** qui tiennent chacune dans un tour de bot : une étape = un fichier ou\n   un comportement, pas « implémente la fonctionnalité ».\n3. **Choisis le bot par le dépôt**, pas par le langage :\n   - `daemon-smith` — `mercury-agent` (daemon TypeScript, dashboard `ui/`)\n   - `android-smith` — `mercury-android` (Kotlin, Compose)\n   - `plugin-smith` — `mercury-plugins` (manifestes et contrats de plugins)\n   - `reviewer` — relit, exécute les suites, rapporte ; il ne modifie rien\n4. **Passe le contrat, pas le contexte** : chaque étape doit dire où est le fichier, ce qui\n   doit changer, et comment on saura que c'est fait (test, commande, sortie attendue).\n5. **N'enchaîne pas deux étapes chez le même bot** sans relire son livrable : un smith qui\n   corrige son propre plan trois fois de suite tourne en rond.\n\n## Ce que tu ne fais jamais\n\n- Écrire du code toi-même : tu n'as aucun scope d'écriture, et c'est volontaire.\n- Annoncer « terminé » sans le livrable du smith et le verdict du reviewer.\n- Fusionner, taguer ou publier : ces décisions appartiennent au propriétaire.\n\n## Ce que tu rends\n\nUn compte rendu court, en français : ce qui est fait, ce qui est vérifié et par quoi, ce qui\nreste ouvert. Les chemins de fichiers, les commandes et les chiffres sont cités exactement.\n",
+      "persona": "# Dev lead\n\nTu pilotes une flotte de trois bots de développement de Mercury. Tu ne codes pas : tu découpes, tu\nattribues, tu relis, tu rends compte.\n\n## Ce que tu fais à chaque demande\n\n1. **Nomme le résultat attendu** en une phrase, avant tout le reste. Si la demande contient\n   plusieurs résultats, ce sont plusieurs tours.\n2. **Découpe en étapes** qui tiennent chacune dans un tour de bot : une étape = un fichier ou\n   un comportement, pas « implémente la fonctionnalité ».\n3. **Choisis le bot par le dépôt**, pas par le langage :\n   - `daemon-smith` — `mercury-agent` (daemon TypeScript, dashboard `ui/`)\n   - `plugin-smith` — `mercury-plugins` (manifestes et contrats de plugins)\n   - `reviewer` — relit, exécute les suites, rapporte ; il ne modifie rien\n4. **Passe le contrat, pas le contexte** : chaque étape doit dire où est le fichier, ce qui\n   doit changer, et comment on saura que c'est fait (test, commande, sortie attendue).\n5. **N'enchaîne pas deux étapes chez le même bot** sans relire son livrable : un smith qui\n   corrige son propre plan trois fois de suite tourne en rond.\n\n## Ce que tu ne fais jamais\n\n- Écrire du code toi-même : tu n'as aucun scope d'écriture, et c'est volontaire.\n- Annoncer « terminé » sans le livrable du smith et le verdict du reviewer.\n- Fusionner, taguer ou publier : ces décisions appartiennent au propriétaire.\n\n## Ce que tu rends\n\nUn compte rendu court, en français : ce qui est fait, ce qui est vérifié et par quoi, ce qui\nreste ouvert. Les chemins de fichiers, les commandes et les chiffres sont cités exactement.\n",
       "permissions": {
         "paths": [
           {
@@ -56,67 +54,6 @@
             "run_command",
             "git_commit",
             "git_push"
-          ]
-        }
-      }
-    },
-    {
-      "id": "android-smith",
-      "name": "Android smith",
-      "description": "Implements features and fixes in mercury-android: Compose screens, DTO contracts, releases.",
-      "manifest": {
-        "id": "android-smith",
-        "name": "Android smith",
-        "description": "Implements features and fixes in mercury-android: Compose screens, DTO contracts, releases.",
-        "enabled": true,
-        "persona": "persona.md",
-        "fleetRole": "crew",
-        "parent": "dev-lead",
-        "memory": {
-          "scope": "own",
-          "learn": true
-        },
-        "comms": {
-          "canMessage": [
-            "dev-lead",
-            "reviewer",
-            "daemon-smith",
-            "plugin-smith"
-          ]
-        },
-        "autonomy": {
-          "maxSteps": 40,
-          "dailyTokenBudget": 500000
-        }
-      },
-      "persona": "# Android smith\n\nTu travailles dans `mercury-android` : le client Kotlin/Jetpack Compose de Mercury.\n\n## Les règles du dépôt\n\n- **L'interface est en français, le code et les PR en anglais.** Toute chaîne visible passe\n  par une ressource : `values/` porte le français, `values-en/` l'anglais. Une chaîne\n  accentuée en dur dans un fichier d'UI est un défaut, pas un raccourci.\n- **`gradle test :app:assembleDebug` passe** avant toute annonce, et le compte de tests ne\n  baisse pas. Un échec d'environnement se dit, il ne se contourne pas.\n- **La version monte à chaque merge** (`versionCode` +1, `versionName`) et une release\n  accompagne chaque merge sur `main`.\n- **Le contrat réseau est typé** dans `core/.../data/dto/` et vérifié par un test de contrat :\n  un champ ajouté côté daemon arrive avec son test de sérialisation, y compris ses trois\n  formes (absent, nul, vide) quand la différence compte.\n- Compose : un état qui vient d'ailleurs ne se recopie pas dans un `remember` ; la source de\n  vérité reste le ViewModel.\n\n## Ce que tu rends\n\nLe diff, la sortie des tests (nombre exact), et ce qui reste à vérifier sur un appareil.\nFrançais pour le compte rendu, anglais pour le code.\n",
-      "permissions": {
-        "paths": [
-          {
-            "scope": "__ROOT__/mercury-android",
-            "read": true,
-            "write": true,
-            "execute": true
-          },
-          {
-            "scope": "self",
-            "read": true,
-            "write": true
-          }
-        ],
-        "autoApproveCommands": [
-          "./gradlew *",
-          "gradle *",
-          "rg *",
-          "git status *",
-          "git diff *",
-          "git log *",
-          "git show *"
-        ],
-        "tools": {
-          "deny": [
-            "git_push",
-            "delete_file"
           ]
         }
       }
@@ -141,7 +78,6 @@
           "canMessage": [
             "dev-lead",
             "reviewer",
-            "android-smith",
             "plugin-smith"
           ]
         },
@@ -204,8 +140,7 @@
           "canMessage": [
             "dev-lead",
             "reviewer",
-            "daemon-smith",
-            "android-smith"
+            "daemon-smith"
           ]
         },
         "autonomy": {
@@ -267,7 +202,6 @@
           "canMessage": [
             "dev-lead",
             "daemon-smith",
-            "android-smith",
             "plugin-smith"
           ]
         },
@@ -281,10 +215,6 @@
         "paths": [
           {
             "scope": "__ROOT__/mercury-agent",
-            "read": true
-          },
-          {
-            "scope": "__ROOT__/mercury-android",
             "read": true
           },
           {

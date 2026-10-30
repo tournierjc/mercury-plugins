@@ -1,8 +1,6 @@
 paths:
   - scope: __ROOT__/mercury-agent
     read: true
-  - scope: __ROOT__/mercury-android
-    read: true
   - scope: __ROOT__/mercury-plugins
     read: true
 autoApproveCommands:
